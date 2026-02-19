@@ -1,0 +1,45 @@
+// Prisma schema for Habits PWA — Supabase Postgres
+// Use DATABASE_URL for runtime (pooled ok), DIRECT_URL for migrations (non-pooled recommended)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Habit {
+  id           String      @id @default(uuid()) @db.Uuid
+  name         String      @db.Text
+  targetPerDay Int         @map("target_per_day") // >= 1
+  archived     Boolean     @default(false)
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  logs         HabitLog[]
+  skips        HabitSkip[]
+}
+
+model HabitSkip {
+  id          String   @id @default(uuid()) @db.Uuid
+  habitId     String   @map("habit_id") @db.Uuid
+  skippedDate DateTime @map("skipped_date") @db.Date
+  habit       Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  @@unique([habitId, skippedDate])
+}
+
+model HabitLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  habitId    String   @map("habit_id") @db.Uuid
+  occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
+  habit      Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String   @db.Text
+  dueDate   DateTime @map("due_date") @db.Date
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+}

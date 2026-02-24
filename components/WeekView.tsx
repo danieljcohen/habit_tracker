@@ -360,9 +360,6 @@ export function WeekView({
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
-        Check off habits in To-dos for each day.
-      </p>
     </div>
   );
 }

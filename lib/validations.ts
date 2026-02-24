@@ -51,6 +51,24 @@ export const listTasksSchema = z.object({
   dueDateISO: z.string().regex(localDateRegex),
 });
 
+export const foodCategorySchema = z.enum([
+  "breakfast",
+  "lunch",
+  "dinner",
+  "other",
+]);
+export type FoodCategory = z.infer<typeof foodCategorySchema>;
+
+export const addFoodEntrySchema = z.object({
+  dateISO: z.string().regex(localDateRegex),
+  category: foodCategorySchema,
+  description: z.string().min(1).max(2000),
+});
+export const deleteFoodEntrySchema = z.object({ id: uuid });
+export const listFoodSchema = z.object({
+  dateISO: z.string().regex(localDateRegex),
+});
+
 export type CreateHabitInput = z.infer<typeof createHabitSchema>;
 export type UpdateHabitInput = z.infer<typeof updateHabitSchema>;
 export type LogHabitInput = z.infer<typeof logHabitSchema>;
@@ -58,3 +76,4 @@ export type UnlogHabitInput = z.infer<typeof unlogHabitSchema>;
 export type WeekDataInput = z.infer<typeof weekDataSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type ListTasksInput = z.infer<typeof listTasksSchema>;
+export type AddFoodEntryInput = z.infer<typeof addFoodEntrySchema>;

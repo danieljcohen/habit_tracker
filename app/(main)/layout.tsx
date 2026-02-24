@@ -15,7 +15,7 @@ export default async function MainLayout({
 
   return (
     <div className="min-h-dvh flex flex-col bg-stone-50 dark:bg-stone-950">
-      <main className="flex-1 pb-20 pb-safe">
+      <main className="flex-1 pb-28 pb-safe">
         {children}
       </main>
       <BottomNav />

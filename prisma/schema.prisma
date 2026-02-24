@@ -59,3 +59,13 @@ model DayOrderItem {
   @@unique([dateISO, itemType, itemId])
   @@index([dateISO, position])
 }
+
+model FoodLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  dateISO     String   @map("date_iso") @db.Text
+  category    String   @db.Text // breakfast | lunch | dinner | other
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([dateISO, category])
+}

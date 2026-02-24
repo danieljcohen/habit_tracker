@@ -1,6 +1,7 @@
 import { listTasks } from "@/app/actions/tasks";
 import { getWeekData } from "@/app/actions/week-data";
 import { getDayOrder } from "@/app/actions/day-order";
+import { listFoodForDay } from "@/app/actions/food-logs";
 import { getWeekStartMonday } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -44,11 +45,13 @@ export default async function TasksPage({ searchParams }: PageProps) {
       ? params.date
       : today;
   const weekStart = getWeekStartMonday(dateISO);
-  const [{ tasks }, { habits }, { order }] = await Promise.all([
-    listTasks({ dueDateISO: dateISO }),
-    getWeekData(weekStart),
-    getDayOrder({ dateISO }),
-  ]);
+  const [{ tasks }, { habits }, { order }, { entries: foodEntries }] =
+    await Promise.all([
+      listTasks({ dueDateISO: dateISO }),
+      getWeekData(weekStart),
+      getDayOrder({ dateISO }),
+      listFoodForDay({ dateISO }),
+    ]);
 
   const habitsForDate: HabitForDate[] = habits
     .filter((h) => !h.archived)
@@ -103,6 +106,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
   return (
     <TasksView
       initialItems={ordered}
+      initialFood={foodEntries}
       selectedDateISO={dateISO}
       todayISO={today}
     />

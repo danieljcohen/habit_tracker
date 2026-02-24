@@ -44,14 +44,32 @@ export default async function TasksPage({ searchParams }: PageProps) {
     params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date)
       ? params.date
       : today;
-  const weekStart = getWeekStartMonday(dateISO);
-  const [{ tasks }, { habits }, { order }, { entries: foodEntries }] =
-    await Promise.all([
+  type TasksResult = Awaited<ReturnType<typeof listTasks>>;
+  type WeekResult = Awaited<ReturnType<typeof getWeekData>>;
+  type DayOrderResult = Awaited<ReturnType<typeof getDayOrder>>;
+  type FoodResult = Awaited<ReturnType<typeof listFoodForDay>>;
+
+  let tasks: TasksResult["tasks"] = [];
+  let habits: WeekResult["habits"] = [];
+  let order: DayOrderResult["order"] = [];
+  let foodEntries: FoodResult["entries"] = [];
+
+  try {
+    const weekStart = getWeekStartMonday(dateISO);
+    const [tasksRes, weekRes, orderRes, foodRes] = await Promise.all([
       listTasks({ dueDateISO: dateISO }),
       getWeekData(weekStart),
       getDayOrder({ dateISO }),
       listFoodForDay({ dateISO }),
     ]);
+    tasks = tasksRes.tasks;
+    habits = weekRes.habits;
+    order = orderRes.order;
+    foodEntries = foodRes.entries;
+  } catch (error) {
+    // Don't let transient backend errors break the build; show empty Today view instead.
+    console.error("Failed to load Today data", error);
+  }
 
   const habitsForDate: HabitForDate[] = habits
     .filter((h) => !h.archived)

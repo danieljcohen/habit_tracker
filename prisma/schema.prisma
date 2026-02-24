@@ -14,7 +14,7 @@ datasource db {
 model Habit {
   id           String      @id @default(uuid()) @db.Uuid
   name         String      @db.Text
-  targetPerDay Int         @map("target_per_day") // >= 1
+  targetPerWeek Int        @map("target_per_week") // >= 1
   archived     Boolean     @default(false)
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   logs         HabitLog[]

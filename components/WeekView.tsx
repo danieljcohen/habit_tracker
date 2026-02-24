@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { HabitWithCounts } from "@/app/actions/week-data";
-import { logHabitCompletion, unlogHabitCompletion } from "@/app/actions/habit-logs";
-import { skipHabit, unskipHabit } from "@/app/actions/habit-skips";
+import {
+  createHabit,
+  updateHabit,
+  toggleArchiveHabit,
+} from "@/app/actions/habits";
 import { formatShortDay, formatDayNum, formatWeekRange } from "@/lib/date-utils";
 import { getWeekStartMonday } from "@/lib/timezone";
-import { DayModal } from "./DayModal";
 
 type WeekViewProps = {
   weekDates: string[];
@@ -26,17 +28,15 @@ export function WeekView({
 }: WeekViewProps) {
   const router = useRouter();
   const [showArchived, setShowArchived] = useState(false);
-  const [modal, setModal] = useState<{
-    habitId: string;
-    habitName: string;
-    date: string;
-    count: number;
-    target: number;
-    skipped: boolean;
-  } | null>(null);
+  const [newName, setNewName] = useState("");
+  const [newTarget, setNewTarget] = useState(1);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editTarget, setEditTarget] = useState(1);
   const [pending, setPending] = useState<string | null>(null);
 
   const displayHabits = showArchived ? allHabits : initialHabits;
+  const manageHabits = allHabits;
 
   function goToWeek(weekStart: string) {
     router.push("/?week=" + weekStart);
@@ -59,55 +59,175 @@ export function WeekView({
     goToWeek(mon);
   }
 
-  async function handleLog(habitId: string, date: string) {
-    const key = `${habitId}-${date}`;
-    if (pending) return;
-    setPending(key);
-    await logHabitCompletion(habitId, date);
+  async function handleCreateHabit(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name || pending) return;
+    if (newTarget < 1) return;
+    setPending("create");
+    const result = await createHabit({ name, targetPerWeek: newTarget });
     setPending(null);
-    router.refresh();
-    if (modal?.habitId === habitId && modal?.date === date) {
-      setModal((m) => (m ? { ...m, count: m.count + 1 } : null));
+    if (result.success && result.habit) {
+      setNewName("");
+      setNewTarget(1);
+      router.refresh();
     }
   }
 
-  async function handleUnlog(habitId: string, date: string) {
-    const key = `u-${habitId}-${date}`;
-    if (pending) return;
-    setPending(key);
-    const result = await unlogHabitCompletion(habitId, date);
-    setPending(null);
-    router.refresh();
-    if (modal?.habitId === habitId && modal?.date === date && result.success) {
-      setModal((m) => (m ? { ...m, count: Math.max(0, m.count - 1) } : null));
-    }
+  function startEdit(h: HabitWithCounts) {
+    setEditingId(h.id);
+    setEditName(h.name);
+    setEditTarget(h.targetPerWeek);
   }
 
-  async function handleSkip(habitId: string, date: string) {
-    if (pending) return;
-    setPending(`s-${habitId}-${date}`);
-    await skipHabit(habitId, date);
+  async function saveEdit() {
+    if (!editingId || pending) return;
+    setPending(editingId);
+    await updateHabit({
+      id: editingId,
+      name: editName.trim(),
+      targetPerWeek: editTarget,
+    });
     setPending(null);
+    setEditingId(null);
     router.refresh();
-    if (modal?.habitId === habitId && modal?.date === date) {
-      setModal((m) => (m ? { ...m, skipped: true } : null));
-    }
   }
 
-  async function handleUnskip(habitId: string, date: string) {
+  async function handleArchive(id: string) {
     if (pending) return;
-    setPending(`u-${habitId}-${date}`);
-    await unskipHabit(habitId, date);
+    setPending(id);
+    await toggleArchiveHabit({ id });
     setPending(null);
     router.refresh();
-    if (modal?.habitId === habitId && modal?.date === date) {
-      setModal((m) => (m ? { ...m, skipped: false } : null));
-    }
   }
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
-      {/* Week progress bars */}
+      {/* Manage habits: add + list with edit/archive */}
+      <section className="mb-6 p-4 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800">
+        <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-3">
+          Habits
+        </h2>
+        <form onSubmit={handleCreateHabit} className="mb-4">
+          <div className="flex gap-2 flex-wrap items-end">
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Habit name"
+              className="flex-1 min-w-[120px] px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              disabled={pending !== null}
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-stone-500 dark:text-stone-400 whitespace-nowrap">
+                Days/week:
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={7}
+                value={newTarget}
+                onChange={(e) => setNewTarget(parseInt(e.target.value, 10) || 1)}
+                className="w-12 px-2 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-sm"
+                disabled={pending !== null}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!newName.trim() || pending !== null}
+              className="px-3 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium"
+            >
+              Add
+            </button>
+          </div>
+        </form>
+        <ul className="space-y-2">
+          {manageHabits.map((h) => (
+            <li
+              key={h.id}
+              className={`flex items-center justify-between gap-2 py-2 px-3 rounded-lg border border-stone-200 dark:border-stone-700 ${
+                h.archived ? "opacity-60" : ""
+              }`}
+            >
+              {editingId === h.id ? (
+                <div className="flex-1 flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 min-w-[100px] px-2 py-1.5 rounded border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 text-sm"
+                    autoFocus
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={7}
+                    value={editTarget}
+                    onChange={(e) =>
+                      setEditTarget(parseInt(e.target.value, 10) || 1)
+                    }
+                    className="w-12 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={saveEdit}
+                    disabled={pending !== null}
+                    className="px-2 py-1 rounded bg-teal-600 text-white text-sm"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(null)}
+                    className="px-2 py-1 rounded border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <span className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                      {h.name}
+                    </span>
+                    <span className="text-xs text-stone-500 dark:text-stone-400 ml-2">
+                      {h.targetPerWeek} days/week
+                      {h.archived && " · Archived"}
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(h)}
+                      disabled={pending !== null}
+                      className="p-1.5 rounded text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700"
+                      aria-label="Edit"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleArchive(h.id)}
+                      disabled={pending !== null}
+                      className="p-1.5 rounded text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700"
+                      aria-label={h.archived ? "Unarchive" : "Archive"}
+                    >
+                      {h.archived ? "↩" : "📦"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+        {manageHabits.length === 0 && (
+          <p className="text-sm text-stone-500 dark:text-stone-400 py-2">
+            No habits yet. Add one above.
+          </p>
+        )}
+      </section>
+
+      {/* Week progress (read-only) */}
       <section className="mb-6">
         <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
           Week progress
@@ -122,77 +242,24 @@ export function WeekView({
                 <div
                   className="h-full bg-teal-500 dark:bg-teal-600 rounded-full transition-all"
                   style={{
-                    width: `${h.daysTotal ? (h.daysMet / h.daysTotal) * 100 : 0}%`,
+                    width: `${h.targetPerWeek ? Math.min(100, (h.countThisWeek / h.targetPerWeek) * 100) : 0}%`,
                   }}
                 />
               </div>
-              <span className="text-xs text-stone-500 dark:text-stone-400 w-12 text-right">
-                {h.daysMet}/{h.daysTotal} days
+              <span className="text-xs text-stone-500 dark:text-stone-400 w-14 text-right">
+                {h.countThisWeek}/{h.targetPerWeek}
               </span>
             </div>
           ))}
           {displayHabits.length === 0 && (
             <p className="text-sm text-stone-500 dark:text-stone-400">
-              No habits. Add one in Habits.
+              No habits. Add one above.
             </p>
           )}
         </div>
       </section>
 
-      {/* Today quick controls */}
-      <section className="mb-6">
-        <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
-          Today
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {initialHabits.map((h) => {
-            const count = h.countsByDay[todayISO] ?? 0;
-            const met = count >= h.targetPerDay;
-            const key = `today-${h.id}`;
-            const isPending = pending !== null && pending.includes(h.id);
-            return (
-              <div
-                key={h.id}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border ${
-                  met
-                    ? "bg-teal-50 dark:bg-teal-900/30 border-teal-200 dark:border-teal-800"
-                    : "bg-white dark:bg-stone-800 border-stone-200 dark:border-stone-700"
-                }`}
-              >
-                <span className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate max-w-[100px]">
-                  {h.name}
-                </span>
-                <span className="text-sm text-stone-500 dark:text-stone-400">
-                  {count}/{h.targetPerDay}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleLog(h.id, todayISO)}
-                  disabled={isPending}
-                  className="w-8 h-8 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-lg leading-none flex items-center justify-center"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleUnlog(h.id, todayISO)}
-                  disabled={isPending || count === 0}
-                  className="w-8 h-8 rounded-lg border border-stone-300 dark:border-stone-600 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 disabled:opacity-50 text-sm"
-                >
-                  Undo
-                </button>
-              </div>
-            );
-          })}
-          {initialHabits.length === 0 && (
-            <p className="text-sm text-stone-500 dark:text-stone-400">
-              No habits yet. Add one in Habits.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Week controls */}
+      {/* Week navigation */}
       <div className="flex items-center justify-between gap-2 mb-4">
         <button
           type="button"
@@ -232,7 +299,7 @@ export function WeekView({
         Show archived
       </label>
 
-      {/* Week grid */}
+      {/* Week grid (read-only) */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse min-w-[400px]">
           <thead>
@@ -267,36 +334,24 @@ export function WeekView({
                   {h.name}
                 </td>
                 {weekDates.map((date) => {
-                  const count = h.countsByDay[date] ?? 0;
+                  const done = (h.countsByDay[date] ?? 0) >= 1;
                   const skipped = h.skippedByDay[date] ?? false;
-                  const met = !skipped && count >= h.targetPerDay;
                   const isToday = date === todayISO;
                   return (
                     <td key={date} className="py-1 px-1 text-center">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setModal({
-                            habitId: h.id,
-                            habitName: h.name,
-                            date,
-                            count,
-                            target: h.targetPerDay,
-                            skipped,
-                          })
-                        }
-                        className={`w-10 h-10 rounded-lg border text-sm font-medium transition-colors ${
+                      <div
+                        className={`w-10 h-10 rounded-lg border text-sm font-medium flex items-center justify-center mx-auto ${
                           skipped
                             ? "bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400"
-                            : met
+                            : done
                               ? "bg-teal-500 dark:bg-teal-600 text-white border-teal-600 dark:border-teal-500"
                               : isToday
                                 ? "bg-teal-50 dark:bg-teal-900/30 border-teal-200 dark:border-teal-800 text-stone-800 dark:text-stone-200"
-                                : "bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
+                                : "bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300"
                         }`}
                       >
-                        {skipped ? "—" : count}
-                      </button>
+                        {skipped ? "—" : done ? "✓" : ""}
+                      </div>
                     </td>
                   );
                 })}
@@ -305,22 +360,9 @@ export function WeekView({
           </tbody>
         </table>
       </div>
-
-      {modal && (
-        <DayModal
-          habitName={modal.habitName}
-          date={modal.date}
-          count={modal.count}
-          target={modal.target}
-          skipped={modal.skipped}
-          onLog={() => handleLog(modal.habitId, modal.date)}
-          onUnlog={() => handleUnlog(modal.habitId, modal.date)}
-          onSkip={() => handleSkip(modal.habitId, modal.date)}
-          onUnskip={() => handleUnskip(modal.habitId, modal.date)}
-          onClose={() => setModal(null)}
-          pending={pending !== null}
-        />
-      )}
+      <p className="text-xs text-stone-500 dark:text-stone-400 mt-2">
+        Check off habits in To-dos for each day.
+      </p>
     </div>
   );
 }

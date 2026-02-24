@@ -14,7 +14,7 @@ export async function createHabit(input: CreateHabitInput) {
   const habit = await prisma.habit.create({
     data: {
       name: data.name,
-      targetPerDay: data.targetPerDay,
+      targetPerWeek: data.targetPerWeek,
     },
   });
   return { success: true as const, habit };
@@ -24,7 +24,7 @@ export async function updateHabit(input: UpdateHabitInput) {
   const data = updateHabitSchema.parse(input);
   await prisma.habit.update({
     where: { id: data.id },
-    data: { name: data.name, targetPerDay: data.targetPerDay },
+    data: { name: data.name, targetPerWeek: data.targetPerWeek },
   });
   return { success: true as const };
 }

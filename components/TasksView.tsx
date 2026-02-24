@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   createTask,
   toggleTaskComplete,
   deleteTask,
 } from "@/app/actions/tasks";
+import { logHabitCompletion, unlogHabitCompletion } from "@/app/actions/habit-logs";
+import type { HabitForDate } from "@/app/(main)/tasks/page";
 import { addDays, format, subDays } from "date-fns";
 
 type Task = {
@@ -19,19 +21,27 @@ type Task = {
 
 type TasksViewProps = {
   initialTasks: Task[];
+  habitsForDate: HabitForDate[];
   selectedDateISO: string;
   todayISO: string;
 };
 
 export function TasksView({
   initialTasks,
+  habitsForDate,
   selectedDateISO,
   todayISO,
 }: TasksViewProps) {
   const router = useRouter();
+  const [tasks, setTasks] = useState(initialTasks);
+  const [habits, setHabits] = useState(habitsForDate);
   const [newTitle, setNewTitle] = useState("");
   const [pending, setPending] = useState<string | null>(null);
-  const tasks = initialTasks;
+
+  useEffect(() => {
+    setTasks(initialTasks);
+    setHabits(habitsForDate);
+  }, [selectedDateISO, initialTasks, habitsForDate]);
 
   function prevDay() {
     const d = subDays(new Date(selectedDateISO + "T12:00:00"), 1);
@@ -62,26 +72,76 @@ export function TasksView({
       dueDateISO: selectedDateISO,
     });
     setPending(null);
-    if (result.success) {
+    if (result.success && result.task) {
       setNewTitle("");
-      router.refresh();
+      setTasks((prev) => [...prev, result.task!]);
     }
   }
 
   async function handleToggle(id: string) {
     if (pending) return;
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    );
     setPending(id);
-    await toggleTaskComplete({ id });
+    const result = await toggleTaskComplete({ id });
     setPending(null);
-    router.refresh();
+    if (!result.success) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, completed: task.completed } : t))
+      );
+      router.refresh();
+    }
   }
 
   async function handleDelete(id: string) {
     if (pending) return;
+    const removed = tasks.find((t) => t.id === id);
+    if (!removed) return;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
     setPending(id);
-    await deleteTask({ id });
+    const result = await deleteTask({ id });
     setPending(null);
-    router.refresh();
+    if (!result.success) {
+      setTasks((prev) => [...prev, removed]);
+      router.refresh();
+    }
+  }
+
+  async function handleHabitToggle(habitId: string, currentlyDone: boolean) {
+    if (pending) return;
+    setHabits((prev) =>
+      prev.map((h) =>
+        h.id === habitId
+          ? {
+              ...h,
+              done: !currentlyDone,
+              countThisWeek: h.countThisWeek + (currentlyDone ? -1 : 1),
+            }
+          : h
+      )
+    );
+    setPending(habitId);
+    const result = currentlyDone
+      ? await unlogHabitCompletion(habitId, selectedDateISO)
+      : await logHabitCompletion(habitId, selectedDateISO);
+    setPending(null);
+    if (!result.success) {
+      setHabits((prev) =>
+        prev.map((h) =>
+          h.id === habitId
+            ? {
+                ...h,
+                done: currentlyDone,
+                countThisWeek: h.countThisWeek + (currentlyDone ? 1 : -1),
+              }
+            : h
+        )
+      );
+      router.refresh();
+    }
   }
 
   const isToday = selectedDateISO === todayISO;
@@ -95,7 +155,7 @@ export function TasksView({
         To-dos
       </h1>
       <p className="text-sm text-stone-500 dark:text-stone-400 mb-4">
-        One-off items for the day (separate from habits)
+        Habits and one-off tasks for the day
       </p>
 
       {/* Date navigation */}
@@ -131,6 +191,64 @@ export function TasksView({
         </button>
       </div>
 
+      {/* Habits (check off for this day) */}
+      {habits.length > 0 && (
+        <section className="mb-6">
+          <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
+            Habits
+          </h2>
+          <ul className="space-y-2">
+            {habits.map((h) => (
+              <li
+                key={h.id}
+                className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
+                  h.skipped ? "opacity-70" : ""
+                }`}
+              >
+                {h.skipped ? (
+                  <>
+                    <span className="shrink-0 w-6 h-6 rounded-md border-2 border-amber-400 flex items-center justify-center text-amber-600 dark:text-amber-400 text-xs">
+                      —
+                    </span>
+                    <span className="flex-1 text-stone-500 dark:text-stone-400">
+                      {h.name}
+                    </span>
+                    <span className="text-xs text-stone-400 dark:text-stone-500">
+                      Skipped
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleHabitToggle(h.id, h.done)}
+                      disabled={pending !== null}
+                      className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                        h.done
+                          ? "bg-teal-600 border-teal-600 text-white"
+                          : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
+                      }`}
+                    >
+                      {h.done && <span className="text-sm">✓</span>}
+                    </button>
+                    <span
+                      className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
+                        h.done ? "line-through text-stone-500 dark:text-stone-400" : ""
+                      }`}
+                    >
+                      {h.name}
+                    </span>
+                    <span className="text-xs text-stone-500 dark:text-stone-400">
+                      {h.countThisWeek}/{h.targetPerWeek} days
+                    </span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Add task */}
       <form onSubmit={handleAddTask} className="mb-6">
         <div className="flex gap-2">
@@ -153,6 +271,9 @@ export function TasksView({
       </form>
 
       {/* Task list */}
+      <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
+        Tasks
+      </h2>
       <ul className="space-y-2">
         {tasks.map((task) => (
           <li

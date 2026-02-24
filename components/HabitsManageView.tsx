@@ -11,7 +11,7 @@ import {
 type Habit = {
   id: string;
   name: string;
-  targetPerDay: number;
+  targetPerWeek: number;
   archived: boolean;
   createdAt: Date;
 };
@@ -34,7 +34,7 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
     if (!name || pending) return;
     if (newTarget < 1) return;
     setPending("create");
-    const result = await createHabit({ name, targetPerDay: newTarget });
+    const result = await createHabit({ name, targetPerWeek: newTarget });
     setPending(null);
     if (result.success && result.habit) {
       setNewName("");
@@ -47,7 +47,7 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
   function startEdit(h: Habit) {
     setEditingId(h.id);
     setEditName(h.name);
-    setEditTarget(h.targetPerDay);
+    setEditTarget(h.targetPerWeek);
   }
 
   async function saveEdit() {
@@ -56,7 +56,7 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
     await updateHabit({
       id: editingId,
       name: editName.trim(),
-      targetPerDay: editTarget,
+      targetPerWeek: editTarget,
     });
     setPending(null);
     setEditingId(null);
@@ -64,7 +64,7 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
     setHabits((prev) =>
       prev.map((x) =>
         x.id === editingId
-          ? { ...x, name: editName.trim(), targetPerDay: editTarget }
+          ? { ...x, name: editName.trim(), targetPerWeek: editTarget }
           : x
       )
     );
@@ -99,12 +99,12 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
         />
         <div className="flex items-center gap-2 mb-3">
           <label className="text-sm text-stone-600 dark:text-stone-400">
-            Target per day:
+            Days per week (1–7):
           </label>
           <input
             type="number"
             min={1}
-            max={100}
+            max={7}
             value={newTarget}
             onChange={(e) => setNewTarget(parseInt(e.target.value, 10) || 1)}
             className="w-16 px-2 py-1 rounded border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100"
@@ -139,11 +139,11 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
                   autoFocus
                 />
                 <div className="flex items-center gap-2">
-                  <label className="text-sm text-stone-500">Target:</label>
+                  <label className="text-sm text-stone-500">Days per week:</label>
                   <input
                     type="number"
                     min={1}
-                    max={100}
+                    max={7}
                     value={editTarget}
                     onChange={(e) =>
                       setEditTarget(parseInt(e.target.value, 10) || 1)
@@ -176,7 +176,7 @@ export function HabitsManageView({ initialHabits }: HabitsManageViewProps) {
                     {h.name}
                   </p>
                   <p className="text-sm text-stone-500 dark:text-stone-400">
-                    {h.targetPerDay} per day
+                    {h.targetPerWeek} days/week
                     {h.archived && " · Archived"}
                   </p>
                 </div>

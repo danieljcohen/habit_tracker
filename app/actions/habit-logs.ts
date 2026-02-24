@@ -16,7 +16,18 @@ function getDateISO(dateISO?: string): string {
 export async function logHabitCompletion(habitId: string, dateISO?: string) {
   const data = logHabitSchema.parse({ habitId, dateISO });
   const localDate = getDateISO(data.dateISO);
-  const occurredAt = localDayStartUTC(localDate);
+  const start = localDayStartUTC(localDate);
+  const end = localDayEndUTC(localDate);
+  const existing = await prisma.habitLog.findFirst({
+    where: {
+      habitId: data.habitId,
+      occurredAt: { gte: start, lte: end },
+    },
+  });
+  if (existing) {
+    return { success: false as const, error: "Already logged for this day" };
+  }
+  const occurredAt = start;
   await prisma.habitLog.create({
     data: { habitId: data.habitId, occurredAt },
   });

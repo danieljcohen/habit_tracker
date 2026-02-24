@@ -6,7 +6,8 @@ type DayModalProps = {
   habitName: string;
   date: string;
   count: number;
-  target: number;
+  weekCount: number;
+  targetPerWeek: number;
   skipped: boolean;
   onLog: () => void;
   onUnlog: () => void;
@@ -20,7 +21,8 @@ export function DayModal({
   habitName,
   date,
   count,
-  target,
+  weekCount,
+  targetPerWeek,
   skipped,
   onLog,
   onUnlog,
@@ -49,27 +51,33 @@ export function DayModal({
           {formatShortDay(date)} — {date}
         </p>
         <p className="mt-4 text-2xl font-medium text-stone-800 dark:text-stone-200">
-          {skipped ? "Skipped" : `${count} / ${target}`}
+          {skipped ? "Skipped" : count >= 1 ? "Done" : "Not done"}
+        </p>
+        <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+          {!skipped && `${weekCount} / ${targetPerWeek} days this week`}
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           {!skipped && (
             <>
-              <button
-                type="button"
-                onClick={onLog}
-                disabled={pending}
-                className="flex-1 min-w-[80px] py-3 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-medium"
-              >
-                +
-              </button>
-              <button
-                type="button"
-                onClick={onUnlog}
-                disabled={pending || count === 0}
-                className="flex-1 min-w-[80px] py-3 rounded-xl border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 disabled:opacity-50 font-medium"
-              >
-                Undo
-              </button>
+              {count >= 1 ? (
+                <button
+                  type="button"
+                  onClick={onUnlog}
+                  disabled={pending}
+                  className="flex-1 min-w-[80px] py-3 rounded-xl border border-stone-300 dark:border-stone-600 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-700 disabled:opacity-50 font-medium"
+                >
+                  Undo
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onLog}
+                  disabled={pending}
+                  className="flex-1 min-w-[80px] py-3 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-medium"
+                >
+                  Log
+                </button>
+              )}
             </>
           )}
           <button

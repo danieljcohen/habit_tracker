@@ -11,14 +11,14 @@ import {
 export type HabitWithCounts = {
   id: string;
   name: string;
-  targetPerDay: number;
+  targetPerWeek: number;
   archived: boolean;
   countsByDay: Record<string, number>;
   skippedByDay: Record<string, boolean>;
-  /** For week dashboard: days in this week where count >= targetPerDay */
-  daysMet: number;
-  /** Total days in week (7) */
-  daysTotal: number;
+  /** Total completions this week (for weekly target) */
+  countThisWeek: number;
+  /** Whether the weekly target was met */
+  weekMet: boolean;
 };
 
 export async function getWeekData(weekStartISO: string) {
@@ -49,11 +49,10 @@ export async function getWeekData(weekStartISO: string) {
       },
     });
     for (const log of logs) {
-      countsByHabitAndDay[log.habitId][date] =
-        (countsByHabitAndDay[log.habitId][date] ?? 0) + 1;
+      const current = countsByHabitAndDay[log.habitId][date] ?? 0;
+      countsByHabitAndDay[log.habitId][date] = Math.min(current + 1, 1);
     }
   }
-  const dayDateStrs = dates.map((d) => d);
   for (const h of habits) {
     for (const skip of h.skips) {
       const d = skip.skippedDate.toISOString().slice(0, 10);
@@ -63,20 +62,19 @@ export async function getWeekData(weekStartISO: string) {
     }
   }
   const result: HabitWithCounts[] = habits.map((h) => {
-    let daysMet = 0;
+    let countThisWeek = 0;
     for (const date of dates) {
-      const count = countsByHabitAndDay[h.id][date] ?? 0;
-      if (count >= h.targetPerDay) daysMet++;
+      countThisWeek += Math.min(countsByHabitAndDay[h.id][date] ?? 0, 1);
     }
     return {
       id: h.id,
       name: h.name,
-      targetPerDay: h.targetPerDay,
+      targetPerWeek: h.targetPerWeek,
       archived: h.archived,
       countsByDay: countsByHabitAndDay[h.id],
       skippedByDay: skippedByHabitAndDay[h.id],
-      daysMet,
-      daysTotal: dates.length,
+      countThisWeek,
+      weekMet: countThisWeek >= h.targetPerWeek,
     };
   });
   return { weekDates: dates, habits: result };

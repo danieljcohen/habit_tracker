@@ -5,13 +5,13 @@ const localDateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 export const createHabitSchema = z.object({
   name: z.string().min(1).max(200),
-  targetPerDay: z.number().int().min(1).max(100),
+  targetPerWeek: z.number().int().min(1).max(7),
 });
 
 export const updateHabitSchema = z.object({
   id: uuid,
   name: z.string().min(1).max(200),
-  targetPerDay: z.number().int().min(1).max(100),
+  targetPerWeek: z.number().int().min(1).max(7),
 });
 
 export const habitIdSchema = z.object({ id: uuid });

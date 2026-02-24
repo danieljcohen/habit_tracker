@@ -1,12 +1,7 @@
-import { prisma } from "@/lib/db";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-import { HabitsManageView } from "@/components/HabitsManageView";
 
-export default async function HabitsPage() {
-  const habits = await prisma.habit.findMany({
-    orderBy: { createdAt: "asc" },
-  });
-
-  return <HabitsManageView initialHabits={habits} />;
+export default function HabitsPage() {
+  redirect("/");
 }

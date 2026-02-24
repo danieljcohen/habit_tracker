@@ -77,3 +77,12 @@ export type WeekDataInput = z.infer<typeof weekDataSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type ListTasksInput = z.infer<typeof listTasksSchema>;
 export type AddFoodEntryInput = z.infer<typeof addFoodEntrySchema>;
+
+export const addWeightEntrySchema = z.object({
+  dateISO: z.string().regex(localDateRegex),
+  weightKg: z.number().positive().max(400),
+});
+export const listWeightSchema = z.object({
+  daysBack: z.number().int().min(1).max(365).optional(),
+});
+export type AddWeightEntryInput = z.infer<typeof addWeightEntrySchema>;

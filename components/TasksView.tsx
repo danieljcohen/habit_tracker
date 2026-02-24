@@ -287,6 +287,26 @@ export function TasksView({
   async function handleSubmitFoodForDay() {
     if (pending) return;
     if (food.length === 0) return;
+
+    // Require confirmation if any main meal category is empty.
+    const categoriesPresent = new Set<FoodCategory>(
+      food.map((e) => e.category),
+    );
+    const mainMeals: FoodCategory[] = ["breakfast", "lunch", "dinner"];
+    const missing = mainMeals.filter((c) => !categoriesPresent.has(c));
+    if (missing.length > 0) {
+      const missingLabels = FOOD_CATEGORIES.filter(({ key }) =>
+        missing.includes(key),
+      )
+        .map(({ label }) => label)
+        .join(", ");
+      const message = `You haven't logged anything for ${missingLabels}. Submit anyway?`;
+      if (typeof window !== "undefined") {
+        const ok = window.confirm(message);
+        if (!ok) return;
+      }
+    }
+
     setPending("submit-food");
     const result = await submitFoodForDay({ dateISO: selectedDateISO });
     setPending(null);

@@ -21,3 +21,16 @@ export async function memoizeAsync<T>(
   return value;
 }
 
+export function invalidateCacheKey(key: string) {
+  store.delete(key);
+}
+
+export function invalidateCachePrefix(prefix: string) {
+  for (const k of store.keys()) {
+    if (k.startsWith(prefix)) {
+      store.delete(k);
+    }
+  }
+}
+
+

@@ -6,11 +6,17 @@ import {
   localDayStartUTC,
   localDayEndUTC,
   utcToLocalDateString,
+  getWeekStartMonday,
 } from "@/lib/timezone";
 
 function getDateISO(dateISO?: string): string {
   if (dateISO) return dateISO;
   return utcToLocalDateString(new Date());
+}
+
+function invalidateForDate(localDate: string) {
+  const weekStart = getWeekStartMonday(localDate);
+  // No-op for now; left in place for potential future tag-based invalidation.
 }
 
 export async function logHabitCompletion(habitId: string, dateISO?: string) {
@@ -31,6 +37,7 @@ export async function logHabitCompletion(habitId: string, dateISO?: string) {
   await prisma.habitLog.create({
     data: { habitId: data.habitId, occurredAt },
   });
+  invalidateForDate(localDate);
   return { success: true as const };
 }
 
@@ -48,5 +55,7 @@ export async function unlogHabitCompletion(habitId: string, dateISO?: string) {
   });
   if (!latest) return { success: false as const, error: "No log to undo" };
   await prisma.habitLog.delete({ where: { id: latest.id } });
+  invalidateForDate(localDate);
   return { success: true as const };
 }
+

@@ -34,6 +34,8 @@ model HabitLog {
   habitId    String   @map("habit_id") @db.Uuid
   occurredAt DateTime @map("occurred_at") @db.Timestamptz(6)
   habit      Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@index([habitId, occurredAt])
 }
 
 model Task {
@@ -42,4 +44,7 @@ model Task {
   dueDate   DateTime @map("due_date") @db.Date
   completed Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([dueDate])
+  @@index([dueDate, completed])
 }

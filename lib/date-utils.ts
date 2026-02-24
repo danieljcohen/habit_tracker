@@ -20,10 +20,14 @@ export function formatWeekRange(weekDates: string[]): string {
   if (weekDates.length < 2) return weekDates[0] ?? "";
   const first = weekDates[0];
   const last = weekDates[6];
-  const m = new Date(first + "T12:00:00").toLocaleDateString("en-US", {
-    month: "short",
-  });
-  const d1 = new Date(first + "T12:00:00").getDate();
-  const d2 = new Date(last + "T12:00:00").getDate();
-  return `${m} ${d1}–${d2}`;
+  const firstDate = new Date(first + "T12:00:00");
+  const lastDate = new Date(last + "T12:00:00");
+  const m1 = firstDate.toLocaleDateString("en-US", { month: "short" });
+  const m2 = lastDate.toLocaleDateString("en-US", { month: "short" });
+  const d1 = firstDate.getDate();
+  const d2 = lastDate.getDate();
+  if (m1 === m2) {
+    return `${m1} ${d1}–${d2}`;
+  }
+  return `${m1} ${d1}–${m2} ${d2}`;
 }

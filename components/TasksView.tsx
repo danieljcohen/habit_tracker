@@ -14,6 +14,7 @@ import {
 } from "@/app/actions/habit-logs";
 import { skipHabit } from "@/app/actions/habit-skips";
 import { updateDayOrder } from "@/app/actions/day-order";
+import { scoreDietForDay } from "@/app/actions/habit-coach";
 import {
   addFoodEntry,
   deleteFoodEntry,
@@ -313,6 +314,12 @@ export function TasksView({
     if (!result?.success) {
       router.refresh();
       return;
+    }
+    // Asynchronously score the day's diet; errors are non-fatal.
+    try {
+      await scoreDietForDay({ dateISO: selectedDateISO });
+    } catch (err) {
+      console.error("Failed to score diet for day", err);
     }
     // Optimistically mark the \"Log food\" habit as done for today.
     setItems((prev) =>

@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MonthMetric } from "@/app/actions/metrics";
 import type { WeightEntry } from "@/app/actions/weight-logs";
+import type { DietScore } from "@prisma/client";
 import { addWeightEntry } from "@/app/actions/weight-logs";
 import { todayISO } from "@/lib/date-utils";
 
 type MetricsViewProps = {
   monthMetrics: MonthMetric[];
   weightEntries: WeightEntry[];
+  dietScores: DietScore[];
 };
 
 function pct(completed: number, total: number): number | null {
@@ -49,7 +51,11 @@ function buildWeightSeries(entries: WeightEntry[]): {
   return { points: pts, min, max };
 }
 
-export function MetricsView({ monthMetrics, weightEntries }: MetricsViewProps) {
+export function MetricsView({
+  monthMetrics,
+  weightEntries,
+  dietScores,
+}: MetricsViewProps) {
   const router = useRouter();
   const [entries, setEntries] = useState<WeightEntry[]>(weightEntries);
   const [newWeight, setNewWeight] = useState<string>("");
@@ -186,6 +192,47 @@ export function MetricsView({ monthMetrics, weightEntries }: MetricsViewProps) {
                 </span>
               )}
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* Diet scores */}
+      <section className="mb-6 p-4 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800">
+        <h2 className="text-sm font-medium text-stone-700 dark:text-stone-200 mb-2">
+          Diet scores
+        </h2>
+        {dietScores.length === 0 ? (
+          <p className="text-xs text-stone-500 dark:text-stone-400">
+            No diet scores yet. Submit your food for the day to get a 1–5
+            score.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <ul className="space-y-1.5 text-xs">
+              {dietScores.map((d) => (
+                <li
+                  key={d.dateISO}
+                  className="flex items-start justify-between gap-2 py-1.5 px-2 rounded-lg bg-stone-50 dark:bg-stone-900/40 border border-stone-200 dark:border-stone-700"
+                >
+                  <span className="text-stone-600 dark:text-stone-300">
+                    {d.dateISO}
+                  </span>
+                  <div className="flex-1 flex flex-col items-end gap-0.5">
+                    <span className="inline-flex items-center gap-1 text-stone-800 dark:text-stone-100">
+                      <span className="font-semibold">{d.score}</span>
+                      <span className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                        /5
+                      </span>
+                    </span>
+                    {d.note && (
+                      <span className="text-[11px] text-stone-500 dark:text-stone-400 text-right">
+                        {d.note}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </section>

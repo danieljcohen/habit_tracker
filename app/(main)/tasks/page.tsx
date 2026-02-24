@@ -97,9 +97,10 @@ export default async function TasksPage({ searchParams }: PageProps) {
     seen.add(key);
   }
 
-  for (const [key, item] of dayItemsMap.entries()) {
+  for (const key of dayItemsMap.keys()) {
     if (!seen.has(key)) {
-      ordered.push(item);
+      const item = dayItemsMap.get(key);
+      if (item) ordered.push(item);
     }
   }
 

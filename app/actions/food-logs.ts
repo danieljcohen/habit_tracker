@@ -75,10 +75,14 @@ export async function submitFoodForDay(input: { dateISO: string }) {
     where: { name: FOOD_HABIT_NAME },
   });
   if (!habit) {
+    const maxOrder = await prisma.habit.aggregate({
+      _max: { sortOrder: true },
+    });
     habit = await prisma.habit.create({
       data: {
         name: FOOD_HABIT_NAME,
         targetPerWeek: 7,
+        sortOrder: (maxOrder._max.sortOrder ?? 0) + 1,
       },
     });
   }

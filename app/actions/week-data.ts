@@ -27,7 +27,7 @@ export async function getWeekData(weekStartISO: string) {
   const dates = getWeekDates(start);
   const dateSet = new Set(dates);
   const habits = await prisma.habit.findMany({
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: {
       id: true,
       name: true,

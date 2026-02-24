@@ -7,6 +7,7 @@ import {
   createHabit,
   updateHabit,
   toggleArchiveHabit,
+  reorderHabits,
 } from "@/app/actions/habits";
 import { formatShortDay, formatDayNum, formatWeekRange } from "@/lib/date-utils";
 import { getWeekStartMonday } from "@/lib/timezone";
@@ -97,6 +98,20 @@ export function WeekView({
     if (pending) return;
     setPending(id);
     await toggleArchiveHabit({ id });
+    setPending(null);
+    router.refresh();
+  }
+
+  async function moveHabit(id: string, direction: "up" | "down") {
+    if (pending) return;
+    const index = manageHabits.findIndex((h) => h.id === id);
+    if (index === -1) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= manageHabits.length) return;
+    const ids = manageHabits.map((h) => h.id);
+    [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+    setPending(`reorder-${id}`);
+    await reorderHabits({ ids });
     setPending(null);
     router.refresh();
   }
@@ -213,6 +228,24 @@ export function WeekView({
                       aria-label={h.archived ? "Unarchive" : "Archive"}
                     >
                       {h.archived ? "↩" : "📦"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(h.id, "up")}
+                      disabled={pending !== null}
+                      className="p-1.5 rounded text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700"
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveHabit(h.id, "down")}
+                      disabled={pending !== null}
+                      className="p-1.5 rounded text-stone-500 hover:bg-stone-100 dark:hover:bg-stone-700"
+                      aria-label="Move down"
+                    >
+                      ↓
                     </button>
                   </div>
                 </>

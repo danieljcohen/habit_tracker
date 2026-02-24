@@ -15,6 +15,7 @@ model Habit {
   id           String      @id @default(uuid()) @db.Uuid
   name         String      @db.Text
   targetPerWeek Int        @map("target_per_week") // >= 1
+  sortOrder    Int         @default(0) @map("sort_order")
   archived     Boolean     @default(false)
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   logs         HabitLog[]

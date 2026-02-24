@@ -48,3 +48,14 @@ model Task {
   @@index([dueDate])
   @@index([dueDate, completed])
 }
+
+model DayOrderItem {
+  id       String @id @default(uuid()) @db.Uuid
+  dateISO  String @map("date_iso") @db.Text
+  itemType String @map("item_type") @db.Text
+  itemId   String @map("item_id") @db.Uuid
+  position Int    @map("position")
+
+  @@unique([dateISO, itemType, itemId])
+  @@index([dateISO, position])
+}

@@ -2,46 +2,56 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { addDays, format, subDays } from "date-fns";
 import {
   createTask,
   toggleTaskComplete,
   deleteTask,
 } from "@/app/actions/tasks";
-import { logHabitCompletion, unlogHabitCompletion } from "@/app/actions/habit-logs";
-import type { HabitForDate } from "@/app/(main)/tasks/page";
-import { addDays, format, subDays } from "date-fns";
-
-type Task = {
-  id: string;
-  title: string;
-  dueDate: Date;
-  completed: boolean;
-  createdAt: Date;
-};
+import {
+  logHabitCompletion,
+  unlogHabitCompletion,
+} from "@/app/actions/habit-logs";
+import { skipHabit } from "@/app/actions/habit-skips";
+import { updateDayOrder } from "@/app/actions/day-order";
+import type { DayItem } from "@/app/(main)/tasks/page";
 
 type TasksViewProps = {
-  initialTasks: Task[];
-  habitsForDate: HabitForDate[];
+  initialItems: DayItem[];
   selectedDateISO: string;
   todayISO: string;
 };
 
 export function TasksView({
-  initialTasks,
-  habitsForDate,
+  initialItems,
   selectedDateISO,
   todayISO,
 }: TasksViewProps) {
   const router = useRouter();
-  const [tasks, setTasks] = useState(initialTasks);
-  const [habits, setHabits] = useState(habitsForDate);
+  const [items, setItems] = useState<DayItem[]>(initialItems);
   const [newTitle, setNewTitle] = useState("");
   const [pending, setPending] = useState<string | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
 
   useEffect(() => {
-    setTasks(initialTasks);
-    setHabits(habitsForDate);
-  }, [selectedDateISO, initialTasks, habitsForDate]);
+    setItems(initialItems);
+  }, [initialItems, selectedDateISO]);
+
+  function keyFor(item: DayItem) {
+    return `${item.kind}:${item.id}`;
+  }
+
+  async function persistOrder(nextItems: DayItem[]) {
+    setItems(nextItems);
+    await updateDayOrder({
+      dateISO: selectedDateISO,
+      items: nextItems.map((item, index) => ({
+        itemType: item.kind,
+        itemId: item.id,
+        position: index,
+      })),
+    });
+  }
 
   function prevDay() {
     const d = subDays(new Date(selectedDateISO + "T12:00:00"), 1);
@@ -74,54 +84,70 @@ export function TasksView({
     setPending(null);
     if (result.success && result.task) {
       setNewTitle("");
-      setTasks((prev) => [...prev, result.task!]);
+      const newItem: DayItem = {
+        kind: "task",
+        id: result.task.id,
+        title: result.task.title,
+        completed: result.task.completed,
+      };
+      const next = [...items, newItem];
+      await persistOrder(next);
     }
   }
 
-  async function handleToggle(id: string) {
+  async function handleToggleTask(id: string) {
     if (pending) return;
-    const task = tasks.find((t) => t.id === id);
-    if (!task) return;
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+    const task = items.find((i) => i.kind === "task" && i.id === id);
+    if (!task || task.kind !== "task") return;
+    const optimistic = items.map((i) =>
+      i.kind === "task" && i.id === id ? { ...i, completed: !i.completed } : i,
     );
+    setItems(optimistic);
     setPending(id);
     const result = await toggleTaskComplete({ id });
     setPending(null);
     if (!result.success) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, completed: task.completed } : t))
+      setItems((prev) =>
+        prev.map((i) =>
+          i.kind === "task" && i.id === id
+            ? { ...i, completed: task.completed }
+            : i,
+        ),
       );
       router.refresh();
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDeleteTask(id: string) {
     if (pending) return;
-    const removed = tasks.find((t) => t.id === id);
+    const removed = items.find((i) => i.kind === "task" && i.id === id);
     if (!removed) return;
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    const next = items.filter((i) => !(i.kind === "task" && i.id === id));
+    setItems(next);
     setPending(id);
     const result = await deleteTask({ id });
     setPending(null);
     if (!result.success) {
-      setTasks((prev) => [...prev, removed]);
+      setItems((prev) => [...prev, removed]);
       router.refresh();
+    } else {
+      await persistOrder(next);
     }
   }
 
   async function handleHabitToggle(habitId: string, currentlyDone: boolean) {
     if (pending) return;
-    setHabits((prev) =>
-      prev.map((h) =>
-        h.id === habitId
+    setItems((prev) =>
+      prev.map((item) =>
+        item.kind === "habit" && item.id === habitId
           ? {
-              ...h,
+              ...item,
               done: !currentlyDone,
-              countThisWeek: h.countThisWeek + (currentlyDone ? -1 : 1),
+              countThisWeek:
+                item.countThisWeek + (currentlyDone ? -1 : 1),
             }
-          : h
-      )
+          : item,
+      ),
     );
     setPending(habitId);
     const result = currentlyDone
@@ -129,20 +155,74 @@ export function TasksView({
       : await logHabitCompletion(habitId, selectedDateISO);
     setPending(null);
     if (!result.success) {
-      setHabits((prev) =>
-        prev.map((h) =>
-          h.id === habitId
+      setItems((prev) =>
+        prev.map((item) =>
+          item.kind === "habit" && item.id === habitId
             ? {
-                ...h,
+                ...item,
                 done: currentlyDone,
-                countThisWeek: h.countThisWeek + (currentlyDone ? 1 : -1),
+                countThisWeek:
+                  item.countThisWeek + (currentlyDone ? 1 : -1),
               }
-            : h
-        )
+            : item,
+        ),
       );
     }
-    // Always re-fetch from the server so changes persist across views.
+    // Ensure other views (like Week) see the updated state.
     router.refresh();
+  }
+
+  async function handleSkipToday(habitId: string) {
+    if (pending) return;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.kind === "habit" && item.id === habitId
+          ? { ...item, skipped: true }
+          : item,
+      ),
+    );
+    setPending(`skip-${habitId}`);
+    const result = await skipHabit(habitId, selectedDateISO);
+    setPending(null);
+    if (!result.success) {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.kind === "habit" && item.id === habitId
+            ? { ...item, skipped: false }
+            : item,
+        ),
+      );
+    }
+    router.refresh();
+  }
+
+  function handleDragStart(
+    e: React.DragEvent<HTMLLIElement>,
+    item: DayItem,
+  ) {
+    setDragKey(keyFor(item));
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(
+    e: React.DragEvent<HTMLLIElement>,
+    overKey: string,
+  ) {
+    e.preventDefault();
+    if (!dragKey || dragKey === overKey) return;
+    const fromIndex = items.findIndex((i) => keyFor(i) === dragKey);
+    const toIndex = items.findIndex((i) => keyFor(i) === overKey);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const updated = [...items];
+    const [moved] = updated.splice(fromIndex, 1);
+    updated.splice(toIndex, 0, moved);
+    setItems(updated);
+  }
+
+  async function handleDragEnd() {
+    if (dragKey === null) return;
+    setDragKey(null);
+    await persistOrder(items);
   }
 
   const isToday = selectedDateISO === todayISO;
@@ -192,16 +272,39 @@ export function TasksView({
         </button>
       </div>
 
-      {/* Habits (check off for this day) */}
-      {habits.length > 0 && (
-        <section className="mb-6">
-          <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
-            Habits
-          </h2>
-          <ul className="space-y-2">
-            {habits.map((h) => (
+      {/* Add task */}
+      <form onSubmit={handleAddTask} className="mb-6">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Add task…"
+            className="flex-1 px-4 py-3 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            disabled={pending !== null}
+          />
+          <button
+            type="submit"
+            disabled={!newTitle.trim() || pending !== null}
+            className="px-4 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-medium"
+          >
+            Add
+          </button>
+        </div>
+      </form>
+
+      {/* Combined habits + tasks list with drag-to-reorder */}
+      <ul className="space-y-2">
+        {items.map((item) => {
+          if (item.kind === "habit") {
+            const h = item;
+            return (
               <li
-                key={h.id}
+                key={keyFor(item)}
+                draggable
+                onDragStart={(e) => handleDragStart(e, item)}
+                onDragOver={(e) => handleDragOver(e, keyFor(item))}
+                onDragEnd={handleDragEnd}
                 className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
                   h.skipped ? "opacity-70" : ""
                 }`}
@@ -234,7 +337,9 @@ export function TasksView({
                     </button>
                     <span
                       className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
-                        h.done ? "line-through text-stone-500 dark:text-stone-400" : ""
+                        h.done
+                          ? "line-through text-stone-500 dark:text-stone-400"
+                          : ""
                       }`}
                     >
                       {h.name}
@@ -242,79 +347,68 @@ export function TasksView({
                     <span className="text-xs text-stone-500 dark:text-stone-400">
                       {h.countThisWeek}/{h.targetPerWeek} days
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSkipToday(h.id)}
+                      disabled={pending !== null}
+                      className="ml-2 w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-300 hover:text-stone-500 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-200 dark:hover:bg-stone-700 text-base"
+                      aria-label="Skip for today"
+                    >
+                      ✕
+                    </button>
                   </>
                 )}
               </li>
-            ))}
-          </ul>
-        </section>
-      )}
+            );
+          }
 
-      {/* Add task */}
-      <form onSubmit={handleAddTask} className="mb-6">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Add task…"
-            className="flex-1 px-4 py-3 rounded-xl border border-stone-300 dark:border-stone-600 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
-            disabled={pending !== null}
-          />
-          <button
-            type="submit"
-            disabled={!newTitle.trim() || pending !== null}
-            className="px-4 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-medium"
-          >
-            Add
-          </button>
-        </div>
-      </form>
-
-      {/* Task list */}
-      <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-2">
-        Tasks
-      </h2>
-      <ul className="space-y-2">
-        {tasks.map((task) => (
-          <li
-            key={task.id}
-            className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
-              task.completed ? "opacity-70" : ""
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => handleToggle(task.id)}
-              disabled={pending !== null}
-              className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                task.completed
-                  ? "bg-teal-600 border-teal-600 text-white"
-                  : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
+          const t = item;
+          return (
+            <li
+              key={keyFor(item)}
+              draggable
+              onDragStart={(e) => handleDragStart(e, item)}
+              onDragOver={(e) => handleDragOver(e, keyFor(item))}
+              onDragEnd={handleDragEnd}
+              className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
+                t.completed ? "opacity-70" : ""
               }`}
             >
-              {task.completed && <span className="text-sm">✓</span>}
-            </button>
-            <span
-              className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
-                task.completed ? "line-through text-stone-500 dark:text-stone-400" : ""
-              }`}
-            >
-              {task.title}
-            </span>
-            <button
-              type="button"
-              onClick={() => handleDelete(task.id)}
-              disabled={pending !== null}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-              aria-label="Delete task"
-            >
-              ✕
-            </button>
-          </li>
-        ))}
+              <button
+                type="button"
+                onClick={() => handleToggleTask(t.id)}
+                disabled={pending !== null}
+                className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  t.completed
+                    ? "bg-teal-600 border-teal-600 text-white"
+                    : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
+                }`}
+              >
+                {t.completed && <span className="text-sm">✓</span>}
+              </button>
+              <span
+                className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
+                  t.completed
+                    ? "line-through text-stone-500 dark:text-stone-400"
+                    : ""
+                }`}
+              >
+                {t.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleDeleteTask(t.id)}
+                disabled={pending !== null}
+                className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-base"
+                aria-label="Delete task"
+              >
+                ✕
+              </button>
+            </li>
+          );
+        })}
       </ul>
-      {tasks.length === 0 && (
+      {items.length === 0 && (
         <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-8">
           No tasks for this day.
         </p>
@@ -322,3 +416,4 @@ export function TasksView({
     </div>
   );
 }
+

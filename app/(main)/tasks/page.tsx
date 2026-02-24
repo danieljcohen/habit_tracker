@@ -1,5 +1,6 @@
 import { listTasks } from "@/app/actions/tasks";
 import { getWeekData } from "@/app/actions/week-data";
+import { getDayOrder } from "@/app/actions/day-order";
 import { getWeekStartMonday } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,23 @@ export type HabitForDate = {
   skipped: boolean;
 };
 
+export type DayItem =
+  | {
+      kind: "habit";
+      id: string;
+      name: string;
+      targetPerWeek: number;
+      countThisWeek: number;
+      done: boolean;
+      skipped: boolean;
+    }
+  | {
+      kind: "task";
+      id: string;
+      title: string;
+      completed: boolean;
+    };
+
 type PageProps = { searchParams: Promise<{ date?: string }> };
 
 export default async function TasksPage({ searchParams }: PageProps) {
@@ -26,10 +44,12 @@ export default async function TasksPage({ searchParams }: PageProps) {
       ? params.date
       : today;
   const weekStart = getWeekStartMonday(dateISO);
-  const [{ tasks }, { habits }] = await Promise.all([
+  const [{ tasks }, { habits }, { order }] = await Promise.all([
     listTasks({ dueDateISO: dateISO }),
     getWeekData(weekStart),
+    getDayOrder({ dateISO }),
   ]);
+
   const habitsForDate: HabitForDate[] = habits
     .filter((h) => !h.archived)
     .map((h) => ({
@@ -41,10 +61,48 @@ export default async function TasksPage({ searchParams }: PageProps) {
       skipped: h.skippedByDay[dateISO] ?? false,
     }));
 
+  const dayItemsMap = new Map<string, DayItem>();
+  for (const h of habitsForDate) {
+    const item: DayItem = {
+      kind: "habit",
+      id: h.id,
+      name: h.name,
+      targetPerWeek: h.targetPerWeek,
+      countThisWeek: h.countThisWeek,
+      done: h.done,
+      skipped: h.skipped,
+    };
+    dayItemsMap.set(`habit:${h.id}`, item);
+  }
+  for (const t of tasks) {
+    const item: DayItem = {
+      kind: "task",
+      id: t.id,
+      title: t.title,
+      completed: t.completed,
+    };
+    dayItemsMap.set(`task:${t.id}`, item);
+  }
+
+  const ordered: DayItem[] = [];
+  const seen = new Set<string>();
+  for (const o of order) {
+    const key = `${o.itemType}:${o.itemId}`;
+    const item = dayItemsMap.get(key);
+    if (!item) continue;
+    ordered.push(item);
+    seen.add(key);
+  }
+
+  for (const [key, item] of dayItemsMap.entries()) {
+    if (!seen.has(key)) {
+      ordered.push(item);
+    }
+  }
+
   return (
     <TasksView
-      initialTasks={tasks}
-      habitsForDate={habitsForDate}
+      initialItems={ordered}
       selectedDateISO={dateISO}
       todayISO={today}
     />

@@ -1,6 +1,7 @@
 import { getWeekData } from "@/app/actions/week-data";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 import { todayISO } from "@/lib/date-utils";
 import { getWeekStartMonday } from "@/lib/timezone";
 import { WeekView } from "@/components/WeekView";

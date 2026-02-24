@@ -140,8 +140,9 @@ export function TasksView({
             : h
         )
       );
-      router.refresh();
     }
+    // Always re-fetch from the server so changes persist across views.
+    router.refresh();
   }
 
   const isToday = selectedDateISO === todayISO;

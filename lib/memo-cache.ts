@@ -26,11 +26,11 @@ export function invalidateCacheKey(key: string) {
 }
 
 export function invalidateCachePrefix(prefix: string) {
-  for (const k of store.keys()) {
-    if (k.startsWith(prefix)) {
-      store.delete(k);
+  store.forEach((_value, key) => {
+    if (key.startsWith(prefix)) {
+      store.delete(key);
     }
-  }
+  });
 }
 
 

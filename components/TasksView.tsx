@@ -166,7 +166,7 @@ export function TasksView({
     const habit = items.find(
       (item) => item.kind === "habit" && item.id === habitId,
     );
-    if (habit && habit.name === FOOD_HABIT_NAME) {
+    if (habit && habit.kind === "habit" && habit.name === FOOD_HABIT_NAME) {
       // This habit can only be checked by submitting food for the day.
       return;
     }

@@ -96,14 +96,14 @@ export async function getMonthMetrics(monthsBack: number = 12) {
     }
 
     let habitWeeksMet = 0;
-    for (const weekStart of weekStarts) {
+    weekStarts.forEach((weekStart) => {
       for (const hid of habitIds) {
         const target = habitTargets[hid] ?? 1;
         const key = `${hid}|${weekStart}`;
         const count = completionsByHabitAndWeek.get(key) ?? 0;
         if (count >= target) habitWeeksMet++;
       }
-    }
+    });
 
     metrics.push({
       monthKey,

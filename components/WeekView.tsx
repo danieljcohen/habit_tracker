@@ -117,7 +117,7 @@ export function WeekView({
   }
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
+    <div className="p-4 pb-28 max-w-2xl mx-auto">
       {/* Manage habits: add + list with edit/archive */}
       <section className="mb-6 p-4 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800">
         <h2 className="text-sm font-medium text-stone-500 dark:text-stone-400 mb-3">

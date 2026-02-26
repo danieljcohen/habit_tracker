@@ -1,6 +1,6 @@
 // Prisma schema for Habits PWA — Supabase Postgres
-// Use DATABASE_URL for runtime (pooled ok), DIRECT_URL for migrations (non-pooled recommended)
-
+// Use DATABASE_URL for runtime (pooled ok), DIRECT_URL for migrations (non-pooled recommended).
+// For Vercel/serverless, set DATABASE_URL with ?connection_limit=1 to avoid "max clients reached".
 generator client {
   provider = "prisma-client-js"
 }

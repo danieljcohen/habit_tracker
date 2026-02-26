@@ -57,6 +57,7 @@ export function MetricsView({
   const [newWeight, setNewWeight] = useState<string>("");
   const [newWeightDate, setNewWeightDate] = useState<string>(todayISO());
   const [pending, setPending] = useState(false);
+  const [selectedDietIdx, setSelectedDietIdx] = useState<number | null>(null);
 
   useEffect(() => {
     setEntries(weightEntries);
@@ -280,35 +281,167 @@ export function MetricsView({
             No diet scores yet. Submit your food for the day to get a 1–5
             score.
           </p>
-        ) : (
-          <div className="space-y-2">
-            <ul className="space-y-1.5 text-xs">
-              {dietScores.map((d) => (
-                <li
-                  key={d.dateISO}
-                  className="flex items-start justify-between gap-2 py-1.5 px-2 rounded-lg bg-stone-50 dark:bg-stone-900/40 border border-stone-200 dark:border-stone-700"
+        ) : (() => {
+          const sorted = [...dietScores].sort((a, b) =>
+            a.dateISO.localeCompare(b.dateISO),
+          );
+          const avg =
+            sorted.reduce((s, d) => s + d.score, 0) / sorted.length;
+          const scoreColor = (score: number) => {
+            if (score >= 5) return "fill-emerald-500 dark:fill-emerald-400";
+            if (score >= 4) return "fill-lime-500 dark:fill-lime-400";
+            if (score >= 3) return "fill-amber-400 dark:fill-amber-300";
+            if (score >= 2) return "fill-orange-500 dark:fill-orange-400";
+            return "fill-red-500 dark:fill-red-400";
+          };
+          const barW = Math.min(
+            8,
+            Math.max(2, (100 - sorted.length) / sorted.length),
+          );
+          const gap =
+            sorted.length === 1
+              ? 0
+              : (100 - barW * sorted.length) / (sorted.length - 1);
+          const selected =
+            selectedDietIdx !== null && selectedDietIdx < sorted.length
+              ? sorted[selectedDietIdx]
+              : null;
+
+          return (
+            <div className="space-y-2">
+              <div className="relative w-full h-44 bg-stone-50 dark:bg-stone-900/40 rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-3">
+                <div className="absolute left-0.5 top-3 bottom-3 w-3 flex flex-col justify-between pointer-events-none">
+                  {[5, 4, 3, 2, 1].map((v) => (
+                    <span
+                      key={v}
+                      className="text-[8px] leading-none text-stone-400 dark:text-stone-500 text-right w-full"
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+                <svg
+                  viewBox="0 0 100 100"
+                  className="w-full h-full"
+                  preserveAspectRatio="none"
                 >
-                  <span className="text-stone-600 dark:text-stone-300">
-                    {d.dateISO}
+                  <defs>
+                    <pattern
+                      id="dietGrid"
+                      width="20"
+                      height="20"
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d="M 20 0 L 0 0 0 20"
+                        fill="none"
+                        className="stroke-stone-300 dark:stroke-stone-600"
+                        strokeWidth="0.3"
+                      />
+                    </pattern>
+                  </defs>
+                  <rect width="100" height="100" fill="url(#dietGrid)" />
+                  {[1, 2, 3, 4, 5].map((v) => {
+                    const y = 100 - (v / 5) * 80 - 10;
+                    return (
+                      <line
+                        key={v}
+                        x1="0"
+                        y1={y}
+                        x2="100"
+                        y2={y}
+                        className="stroke-stone-300 dark:stroke-stone-600"
+                        strokeWidth="0.25"
+                        strokeDasharray="1.5 1"
+                      />
+                    );
+                  })}
+                  {sorted.map((d, i) => {
+                    const x = sorted.length === 1 ? 50 - barW / 2 : i * (barW + gap);
+                    const barH = (d.score / 5) * 80;
+                    const y = 100 - barH - 10;
+                    const isSelected = selectedDietIdx === i;
+                    return (
+                      <g key={d.dateISO}>
+                        <rect
+                          x={x}
+                          y={y}
+                          width={barW}
+                          height={barH}
+                          rx={Math.min(barW / 3, 1.5)}
+                          className={`${scoreColor(d.score)} ${isSelected ? "opacity-100" : "opacity-70"} transition-opacity cursor-pointer`}
+                        />
+                        <rect
+                          x={Math.max(0, x - gap / 2)}
+                          y={0}
+                          width={barW + gap}
+                          height={100}
+                          fill="transparent"
+                          className="cursor-pointer"
+                          onClick={() =>
+                            setSelectedDietIdx(
+                              selectedDietIdx === i ? null : i,
+                            )
+                          }
+                        />
+                        {isSelected && (
+                          <circle
+                            cx={x + barW / 2}
+                            cy={y - 3}
+                            r={1.2}
+                            className="fill-stone-800 dark:fill-stone-200"
+                          />
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+              <div className="flex justify-between text-[10px] text-stone-400 dark:text-stone-500 px-1">
+                {sorted.length > 0 && <span>{sorted[0].dateISO}</span>}
+                {sorted.length > 2 && (
+                  <span>
+                    {sorted[Math.floor(sorted.length / 2)].dateISO}
                   </span>
-                  <div className="flex-1 flex flex-col items-end gap-0.5">
-                    <span className="inline-flex items-center gap-1 text-stone-800 dark:text-stone-100">
-                      <span className="font-semibold">{d.score}</span>
-                      <span className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                )}
+                {sorted.length > 1 && (
+                  <span>{sorted[sorted.length - 1].dateISO}</span>
+                )}
+              </div>
+              <div className="flex justify-between text-xs text-stone-500 dark:text-stone-400">
+                <span>
+                  Avg:{" "}
+                  <span className="font-medium text-stone-800 dark:text-stone-100">
+                    {avg.toFixed(1)}/5
+                  </span>
+                </span>
+                <span className="text-[10px]">
+                  Tap a bar for details
+                </span>
+              </div>
+              {selected && (
+                <div className="mt-1 px-3 py-2.5 rounded-lg bg-stone-100 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-700 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-stone-700 dark:text-stone-200">
+                      {selected.dateISO}
+                    </span>
+                    <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                      {selected.score}
+                      <span className="text-[10px] font-normal text-stone-400 dark:text-stone-500">
                         /5
                       </span>
                     </span>
-                    {d.note && (
-                      <span className="text-[11px] text-stone-500 dark:text-stone-400 text-right">
-                        {d.note}
-                      </span>
-                    )}
                   </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+                  {selected.note && (
+                    <p className="text-[11px] leading-relaxed text-stone-600 dark:text-stone-400">
+                      {selected.note}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </section>
 
       {monthMetrics.length === 0 ? (

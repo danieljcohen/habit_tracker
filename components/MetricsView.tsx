@@ -58,6 +58,7 @@ export function MetricsView({
   const [newWeightDate, setNewWeightDate] = useState<string>(todayISO());
   const [pending, setPending] = useState(false);
   const [selectedDietIdx, setSelectedDietIdx] = useState<number | null>(null);
+  const [monthIdx, setMonthIdx] = useState(0);
 
   useEffect(() => {
     setEntries(weightEntries);
@@ -449,62 +450,115 @@ export function MetricsView({
           No month metrics yet. Log habits or add tasks in a month to see stats
           here.
         </p>
-      ) : (
-        <div className="space-y-4">
-          {monthMetrics.map((m) => {
-            const habitPct = pct(m.habitWeeksMet, m.habitWeeksTotal);
-            const taskPct = pct(m.tasksCompleted, m.tasksTotal);
-            return (
-              <div
-                key={m.monthKey}
-                className="rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4"
+      ) : (() => {
+        const idx = Math.min(monthIdx, monthMetrics.length - 1);
+        const m = monthMetrics[idx];
+        const habitPct = pct(m.habitWeeksMet, m.habitWeeksTotal) ?? 0;
+        const taskPct = pct(m.tasksCompleted, m.tasksTotal) ?? 0;
+        const outerR = 42;
+        const innerR = 32;
+        const outerC = 2 * Math.PI * outerR;
+        const innerC = 2 * Math.PI * innerR;
+        const outerOffset = outerC - (habitPct / 100) * outerC;
+        const innerOffset = innerC - (taskPct / 100) * innerC;
+        return (
+          <section className="mb-6 p-4 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800">
+            <div className="flex items-center justify-between mb-4">
+              <button
+                onClick={() => setMonthIdx(Math.min(idx + 1, monthMetrics.length - 1))}
+                disabled={idx >= monthMetrics.length - 1}
+                className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700 disabled:opacity-20 transition-colors"
+                aria-label="Previous month"
               >
-                <p className="text-sm font-medium text-stone-800 dark:text-stone-200 mb-3">
-                  {m.monthLabel}
-                </p>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between items-center text-sm mb-1">
-                      <span className="text-stone-600 dark:text-stone-400">
-                        Habits
-                      </span>
-                      <span className="font-medium text-stone-900 dark:text-stone-100">
-                        {habitPct !== null ? `${habitPct}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-teal-500 dark:bg-teal-600 rounded-full transition-all"
-                        style={{
-                          width: `${habitPct !== null ? habitPct : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between items-center text-sm mb-1">
-                      <span className="text-stone-600 dark:text-stone-400">
-                        To-dos
-                      </span>
-                      <span className="font-medium text-stone-900 dark:text-stone-100">
-                        {taskPct !== null ? `${taskPct}%` : "—"}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-stone-200 dark:bg-stone-700 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 dark:bg-blue-600 rounded-full transition-all"
-                        style={{
-                          width: `${taskPct !== null ? taskPct : 0}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600 dark:text-stone-300">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <h2 className="text-sm font-semibold text-stone-800 dark:text-stone-100">
+                {m.monthLabel}
+              </h2>
+              <button
+                onClick={() => setMonthIdx(Math.max(idx - 1, 0))}
+                disabled={idx <= 0}
+                className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-700 disabled:opacity-20 transition-colors"
+                aria-label="Next month"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600 dark:text-stone-300">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="relative w-44 h-44">
+                <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                  <circle
+                    cx="50" cy="50" r={outerR}
+                    fill="none"
+                    strokeWidth="6"
+                    className="stroke-stone-200 dark:stroke-stone-700"
+                  />
+                  <circle
+                    cx="50" cy="50" r={outerR}
+                    fill="none"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={outerC}
+                    strokeDashoffset={outerOffset}
+                    className="stroke-teal-500 dark:stroke-teal-400 transition-all duration-500"
+                  />
+                  <circle
+                    cx="50" cy="50" r={innerR}
+                    fill="none"
+                    strokeWidth="6"
+                    className="stroke-stone-200 dark:stroke-stone-700"
+                  />
+                  <circle
+                    cx="50" cy="50" r={innerR}
+                    fill="none"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={innerC}
+                    strokeDashoffset={innerOffset}
+                    className="stroke-blue-500 dark:stroke-blue-400 transition-all duration-500"
+                  />
+                </svg>
+              </div>
+              <div className="mt-3 flex items-center gap-5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-teal-500 dark:bg-teal-400" />
+                  <span className="text-stone-700 dark:text-stone-300">
+                    Habits <span className="font-semibold">{habitPct}%</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500 dark:bg-blue-400" />
+                  <span className="text-stone-700 dark:text-stone-300">
+                    To-dos <span className="font-semibold">{taskPct}%</span>
+                  </span>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="mt-1 text-[10px] text-stone-400 dark:text-stone-500 flex gap-3">
+                <span>{m.habitWeeksMet}/{m.habitWeeksTotal} wks met</span>
+                <span>{m.tasksCompleted}/{m.tasksTotal} tasks done</span>
+              </div>
+              <div className="mt-2 flex items-center gap-1">
+                {monthMetrics.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setMonthIdx(i)}
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                      i === idx
+                        ? "bg-stone-800 dark:bg-stone-200 w-3"
+                        : "bg-stone-300 dark:bg-stone-600"
+                    }`}
+                    aria-label={`Go to month ${i + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+      })()}
     </div>
   );
 }

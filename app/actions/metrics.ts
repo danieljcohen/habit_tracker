@@ -3,7 +3,6 @@
 import { prisma } from "@/lib/db";
 import {
   getWeekStartMonday,
-  getWeekDates,
   localDayStartUTC,
   localDayEndUTC,
   utcToLocalDateString,
@@ -13,7 +12,6 @@ import {
   format,
   startOfMonth,
   endOfMonth,
-  eachDayOfInterval,
 } from "date-fns";
 
 export type MonthMetric = {
@@ -37,6 +35,8 @@ export async function getMonthMetrics(monthsBack: number = 12) {
   const habitTargets = Object.fromEntries(
     habitsList.map((h) => [h.id, h.targetPerWeek]),
   );
+
+  const currentWeekStart = getWeekStartMonday(format(now, "yyyy-MM-dd"));
 
   for (let i = 0; i < monthsBack; i++) {
     const monthStart = startOfMonth(subMonths(now, i));
@@ -75,28 +75,25 @@ export async function getMonthMetrics(monthsBack: number = 12) {
     const hasActivity = monthLogs.length > 0 || tasksInMonth.length > 0;
     if (!hasActivity) continue;
 
-    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const weekStarts = new Set<string>();
-    for (const day of monthDays) {
-      const dateStr = format(day, "yyyy-MM-dd");
-      const mon = getWeekStartMonday(dateStr);
-      weekStarts.add(mon);
-    }
-    const numWeeks = weekStarts.size;
-    const habitWeeksTotal = habitIds.length * numWeeks;
-
+    const activeWeeks = new Set<string>();
     const completionsByHabitAndWeek = new Map<string, number>();
     for (const log of monthLogs) {
       const localDate = utcToLocalDateString(log.occurredAt);
       const weekStart = getWeekStartMonday(localDate);
-      if (!weekStarts.has(weekStart)) continue;
+      if (weekStart === currentWeekStart) continue;
+      activeWeeks.add(weekStart);
       const key = `${log.habitId}|${weekStart}`;
       const current = completionsByHabitAndWeek.get(key) ?? 0;
       completionsByHabitAndWeek.set(key, current + 1);
     }
 
+    const hasTaskActivity = tasksInMonth.length > 0;
+    if (activeWeeks.size === 0 && !hasTaskActivity) continue;
+    const numWeeks = activeWeeks.size;
+    const habitWeeksTotal = habitIds.length * numWeeks;
+
     let habitWeeksMet = 0;
-    weekStarts.forEach((weekStart) => {
+    activeWeeks.forEach((weekStart) => {
       for (const hid of habitIds) {
         const target = habitTargets[hid] ?? 1;
         const key = `${hid}|${weekStart}`;

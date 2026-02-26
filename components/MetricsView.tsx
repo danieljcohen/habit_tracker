@@ -20,35 +20,31 @@ function pct(completed: number, total: number): number | null {
 }
 
 function buildWeightSeries(entries: WeightEntry[]): {
-  points: string;
+  polyline: string;
+  coords: { x: number; y: number; lbs: number; dateISO: string }[];
   min: number | null;
   max: number | null;
 } {
   if (entries.length === 0) {
-    return { points: "", min: null, max: null };
+    return { polyline: "", coords: [], min: null, max: null };
   }
   const weights = entries.map((e) => e.weightKg * 2.2046226218);
   const min = Math.min(...weights);
   const max = Math.max(...weights);
-  if (min === max) {
-    const xs = entries.map((_, i) =>
-      entries.length === 1 ? 50 : (i / (entries.length - 1)) * 100,
-    );
-    const ys = xs.map(() => 50);
-    const pts = xs.map((x, i) => `${x},${ys[i]}`).join(" ");
-    return { points: pts, min, max };
-  }
-  const pts = entries
-    .map((e, i) => {
-      const wLbs = e.weightKg * 2.2046226218;
-      const x =
-        entries.length === 1 ? 50 : (i / (entries.length - 1 || 1)) * 100;
+  const coords = entries.map((e, i) => {
+    const wLbs = e.weightKg * 2.2046226218;
+    const x = entries.length === 1 ? 50 : (i / (entries.length - 1 || 1)) * 100;
+    let y: number;
+    if (min === max) {
+      y = 50;
+    } else {
       const norm = (wLbs - min) / (max - min);
-      const y = 100 - norm * 80 - 10; // keep some padding top/bottom
-      return `${x},${y}`;
-    })
-    .join(" ");
-  return { points: pts, min, max };
+      y = 100 - norm * 70 - 15; // keep some padding top/bottom
+    }
+    return { x, y, lbs: wLbs, dateISO: e.dateISO };
+  });
+  const polyline = coords.map((p) => `${p.x},${p.y}`).join(" ");
+  return { polyline, coords, min, max };
 }
 
 export function MetricsView({
@@ -66,7 +62,7 @@ export function MetricsView({
     setEntries(weightEntries);
   }, [weightEntries]);
 
-  const { points, min, max } = buildWeightSeries(entries);
+  const { polyline, coords, min, max } = buildWeightSeries(entries);
 
   async function handleAddWeight(e: React.FormEvent) {
     e.preventDefault();
@@ -145,21 +141,82 @@ export function MetricsView({
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="w-full h-24 bg-stone-50 dark:bg-stone-900/40 rounded-lg border border-stone-200 dark:border-stone-700 flex items-center justify-center">
+            <div className="relative w-full h-44 bg-stone-50 dark:bg-stone-900/40 rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-3">
+              {min !== null && max !== null && (
+                <div className="absolute left-0 top-3 bottom-3 w-3 flex flex-col justify-between pointer-events-none">
+                  {(() => {
+                    const steps = 5;
+                    const labels: string[] = [];
+                    for (let i = 0; i < steps; i++) {
+                      const v = max - (i / (steps - 1)) * (max - min);
+                      labels.push(v.toFixed(0));
+                    }
+                    if (min === max) return null;
+                    return labels.map((l, i) => (
+                      <span
+                        key={i}
+                        className="text-[8px] leading-none text-stone-400 dark:text-stone-500 text-right w-full"
+                      >
+                        {l}
+                      </span>
+                    ));
+                  })()}
+                </div>
+              )}
               <svg
                 viewBox="0 0 100 100"
                 className="w-full h-full text-teal-500 dark:text-teal-400"
                 preserveAspectRatio="none"
               >
+                <defs>
+                  <pattern id="weightGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path
+                      d="M 20 0 L 0 0 0 20"
+                      fill="none"
+                      className="stroke-stone-300 dark:stroke-stone-600"
+                      strokeWidth="0.3"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="100" height="100" fill="url(#weightGrid)" />
+                {[15, 32.5, 50, 67.5, 85].map((y) => (
+                  <line
+                    key={y}
+                    x1="0" y1={y} x2="100" y2={y}
+                    className="stroke-stone-300 dark:stroke-stone-600"
+                    strokeWidth="0.25"
+                    strokeDasharray="1.5 1"
+                  />
+                ))}
+                <linearGradient id="weightFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="currentColor" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="currentColor" stopOpacity="0.02" />
+                </linearGradient>
+                {coords.length > 1 && (
+                  <polygon
+                    fill="url(#weightFill)"
+                    points={`${coords[0].x},100 ${polyline} ${coords[coords.length - 1].x},100`}
+                  />
+                )}
                 <polyline
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2"
-                  points={points}
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  points={polyline}
                 />
+                {coords.map((p, idx) => (
+                  <circle
+                    key={idx}
+                    cx={p.x}
+                    cy={p.y}
+                    r={1.4}
+                    fill="currentColor"
+                  />
+                ))}
               </svg>
             </div>
-            {/* X-axis dates: start / middle / end */}
             <div className="flex justify-between text-[10px] text-stone-400 dark:text-stone-500 px-1">
               {entries.length > 0 && (
                 <span>{entries[0].dateISO}</span>
@@ -183,14 +240,31 @@ export function MetricsView({
                   lb
                 </span>
               </span>
-              {min !== null && max !== null && (
-                <span>
-                  Range:{" "}
-                  <span className="font-medium text-stone-800 dark:text-stone-100">
-                    {min.toFixed(1)}–{max.toFixed(1)} lb
+              {entries.length >= 2 && (() => {
+                const firstLbs = entries[0].weightKg * 2.2046226218;
+                const lastLbs = entries[entries.length - 1].weightKg * 2.2046226218;
+                const diff = firstLbs - lastLbs;
+                const absDiff = Math.abs(diff).toFixed(1);
+                return (
+                  <span>
+                    {diff >= 0 ? (
+                      <>
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                          −{absDiff} lb
+                        </span>{" "}
+                        lost
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-medium text-red-500 dark:text-red-400">
+                          +{absDiff} lb
+                        </span>{" "}
+                        gained
+                      </>
+                    )}
                   </span>
-                </span>
-              )}
+                );
+              })()}
             </div>
           </div>
         )}

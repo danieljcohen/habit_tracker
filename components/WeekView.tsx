@@ -40,7 +40,7 @@ export function WeekView({
   const manageHabits = allHabits;
 
   function goToWeek(weekStart: string) {
-    router.push("/?week=" + weekStart);
+    router.push("/week?week=" + weekStart);
   }
 
   function prevWeek() {

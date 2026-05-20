@@ -4,6 +4,24 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, format, subDays } from "date-fns";
 import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   createTask,
   toggleTaskComplete,
   deleteTask,
@@ -54,7 +72,18 @@ export function TasksView({
     Partial<Record<FoodCategory, string>>
   >({});
   const [pending, setPending] = useState<string | null>(null);
-  const [dragKey, setDragKey] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 4 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   useEffect(() => {
     setItems(initialItems);
@@ -230,33 +259,14 @@ export function TasksView({
     router.refresh();
   }
 
-  function handleDragStart(
-    e: React.DragEvent<HTMLLIElement>,
-    item: DayItem,
-  ) {
-    setDragKey(keyFor(item));
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragOver(
-    e: React.DragEvent<HTMLLIElement>,
-    overKey: string,
-  ) {
-    e.preventDefault();
-    if (!dragKey || dragKey === overKey) return;
-    const fromIndex = items.findIndex((i) => keyFor(i) === dragKey);
-    const toIndex = items.findIndex((i) => keyFor(i) === overKey);
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const fromIndex = items.findIndex((i) => keyFor(i) === active.id);
+    const toIndex = items.findIndex((i) => keyFor(i) === over.id);
     if (fromIndex === -1 || toIndex === -1) return;
-    const updated = [...items];
-    const [moved] = updated.splice(fromIndex, 1);
-    updated.splice(toIndex, 0, moved);
-    setItems(updated);
-  }
-
-  async function handleDragEnd() {
-    if (dragKey === null) return;
-    setDragKey(null);
-    await persistOrder(items);
+    const next = arrayMove(items, fromIndex, toIndex);
+    await persistOrder(next);
   }
 
   async function handleAddFood(e: React.FormEvent, category: FoodCategory) {
@@ -407,120 +417,31 @@ export function TasksView({
       </form>
 
       {/* Combined habits + tasks list with drag-to-reorder */}
-      <ul className="space-y-2">
-        {items.map((item) => {
-          if (item.kind === "habit") {
-            const h = item;
-            return (
-              <li
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={items.map(keyFor)}
+          strategy={verticalListSortingStrategy}
+        >
+          <ul className="space-y-2">
+            {items.map((item) => (
+              <SortableRow
                 key={keyFor(item)}
-                draggable
-                onDragStart={(e) => handleDragStart(e, item)}
-                onDragOver={(e) => handleDragOver(e, keyFor(item))}
-                onDragEnd={handleDragEnd}
-                className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
-                  h.skipped ? "opacity-70" : ""
-                }`}
-              >
-                {h.skipped ? (
-                  <>
-                    <span className="shrink-0 w-6 h-6 rounded-md border-2 border-amber-400 flex items-center justify-center text-amber-600 dark:text-amber-400 text-xs">
-                      —
-                    </span>
-                    <span className="flex-1 text-stone-500 dark:text-stone-400">
-                      {h.name}
-                    </span>
-                    <span className="text-xs text-stone-400 dark:text-stone-500">
-                      Skipped
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleHabitToggle(h.id, h.done)}
-                      disabled={pending !== null}
-                      className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                        h.done
-                          ? "bg-teal-600 border-teal-600 text-white"
-                          : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
-                      }`}
-                    >
-                      {h.done && <span className="text-sm">✓</span>}
-                    </button>
-                    <span
-                      className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
-                        h.done
-                          ? "line-through text-stone-500 dark:text-stone-400"
-                          : ""
-                      }`}
-                    >
-                      {h.name}
-                    </span>
-                    <span className="text-xs text-stone-500 dark:text-stone-400">
-                      {h.countThisWeek}/{h.targetPerWeek} days
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleSkipToday(h.id)}
-                      disabled={pending !== null}
-                      className="ml-2 w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-300 hover:text-stone-500 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-200 dark:hover:bg-stone-700 text-base"
-                      aria-label="Skip for today"
-                    >
-                      ✕
-                    </button>
-                  </>
-                )}
-              </li>
-            );
-          }
-
-          const t = item;
-          return (
-            <li
-              key={keyFor(item)}
-              draggable
-              onDragStart={(e) => handleDragStart(e, item)}
-              onDragOver={(e) => handleDragOver(e, keyFor(item))}
-              onDragEnd={handleDragEnd}
-              className={`flex items-center gap-3 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
-                t.completed ? "opacity-70" : ""
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => handleToggleTask(t.id)}
-                disabled={pending !== null}
-                className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                  t.completed
-                    ? "bg-teal-600 border-teal-600 text-white"
-                    : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
-                }`}
-              >
-                {t.completed && <span className="text-sm">✓</span>}
-              </button>
-              <span
-                className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
-                  t.completed
-                    ? "line-through text-stone-500 dark:text-stone-400"
-                    : ""
-                }`}
-              >
-                {t.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => handleDeleteTask(t.id)}
-                disabled={pending !== null}
-                className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-base"
-                aria-label="Delete task"
-              >
-                ✕
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                id={keyFor(item)}
+                item={item}
+                pending={pending}
+                onToggleHabit={handleHabitToggle}
+                onSkipHabit={handleSkipToday}
+                onToggleTask={handleToggleTask}
+                onDeleteTask={handleDeleteTask}
+              />
+            ))}
+          </ul>
+        </SortableContext>
+      </DndContext>
       {items.length === 0 && (
         <p className="text-sm text-stone-500 dark:text-stone-400 text-center py-8">
           No habits or tasks for this day.
@@ -606,6 +527,167 @@ export function TasksView({
         </button>
       </section>
     </div>
+  );
+}
+
+type SortableRowProps = {
+  id: string;
+  item: DayItem;
+  pending: string | null;
+  onToggleHabit: (id: string, currentlyDone: boolean) => void;
+  onSkipHabit: (id: string) => void;
+  onToggleTask: (id: string) => void;
+  onDeleteTask: (id: string) => void;
+};
+
+function SortableRow({
+  id,
+  item,
+  pending,
+  onToggleHabit,
+  onSkipHabit,
+  onToggleTask,
+  onDeleteTask,
+}: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const handleClass =
+    "shrink-0 w-7 h-9 -ml-1 mr-1 inline-flex items-center justify-center rounded-md text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 cursor-grab active:cursor-grabbing touch-none select-none";
+
+  if (item.kind === "habit") {
+    const h = item;
+    return (
+      <li
+        ref={setNodeRef}
+        style={style}
+        className={`flex items-center gap-2 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
+          h.skipped ? "opacity-70" : ""
+        } ${isDragging ? "shadow-lg opacity-90" : ""}`}
+      >
+        <button
+          type="button"
+          aria-label="Drag to reorder"
+          className={handleClass}
+          {...attributes}
+          {...listeners}
+        >
+          ⋮⋮
+        </button>
+        {h.skipped ? (
+          <>
+            <span className="shrink-0 w-6 h-6 rounded-md border-2 border-amber-400 flex items-center justify-center text-amber-600 dark:text-amber-400 text-xs">
+              —
+            </span>
+            <span className="flex-1 text-stone-500 dark:text-stone-400">
+              {h.name}
+            </span>
+            <span className="text-xs text-stone-400 dark:text-stone-500">
+              Skipped
+            </span>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => onToggleHabit(h.id, h.done)}
+              disabled={pending !== null}
+              className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                h.done
+                  ? "bg-teal-600 border-teal-600 text-white"
+                  : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
+              }`}
+            >
+              {h.done && <span className="text-sm">✓</span>}
+            </button>
+            <span
+              className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
+                h.done
+                  ? "line-through text-stone-500 dark:text-stone-400"
+                  : ""
+              }`}
+            >
+              {h.name}
+            </span>
+            <span className="text-xs text-stone-500 dark:text-stone-400">
+              {h.countThisWeek}/{h.targetPerWeek} days
+            </span>
+            <button
+              type="button"
+              onClick={() => onSkipHabit(h.id)}
+              disabled={pending !== null}
+              className="ml-2 w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-300 hover:text-stone-500 hover:bg-stone-100 dark:text-stone-500 dark:hover:text-stone-200 dark:hover:bg-stone-700 text-base"
+              aria-label="Skip for today"
+            >
+              ✕
+            </button>
+          </>
+        )}
+      </li>
+    );
+  }
+
+  const t = item;
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 p-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 ${
+        t.completed ? "opacity-70" : ""
+      } ${isDragging ? "shadow-lg opacity-90" : ""}`}
+    >
+      <button
+        type="button"
+        aria-label="Drag to reorder"
+        className={handleClass}
+        {...attributes}
+        {...listeners}
+      >
+        ⋮⋮
+      </button>
+      <button
+        type="button"
+        onClick={() => onToggleTask(t.id)}
+        disabled={pending !== null}
+        className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+          t.completed
+            ? "bg-teal-600 border-teal-600 text-white"
+            : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
+        }`}
+      >
+        {t.completed && <span className="text-sm">✓</span>}
+      </button>
+      <span
+        className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
+          t.completed
+            ? "line-through text-stone-500 dark:text-stone-400"
+            : ""
+        }`}
+      >
+        {t.title}
+      </span>
+      <button
+        type="button"
+        onClick={() => onDeleteTask(t.id)}
+        disabled={pending !== null}
+        className="w-7 h-7 inline-flex items-center justify-center rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-base"
+        aria-label="Delete task"
+      >
+        ✕
+      </button>
+    </li>
   );
 }
 

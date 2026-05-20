@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/", label: "Week", icon: "📅" },
   { href: "/tasks", label: "Today", icon: "✓" },
+  { href: "/week", label: "Week", icon: "📅" },
   { href: "/metrics", label: "Metrics", icon: "📊" },
   { href: "/coach", label: "Coach", icon: "💬" },
 ] as const;
@@ -19,8 +19,7 @@ export function BottomNav() {
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       {tabs.map(({ href, label, icon }) => {
-        const isActive =
-          href === "/" ? pathname === "/" : pathname.startsWith(href);
+        const isActive = pathname.startsWith(href);
         return (
           <Link
             key={href}

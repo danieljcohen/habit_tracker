@@ -45,9 +45,13 @@ model Task {
   dueDate   DateTime @map("due_date") @db.Date
   completed Boolean  @default(false)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  parentId  String?  @map("parent_id") @db.Uuid
+  parent    Task?    @relation("TaskSubtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks  Task[]   @relation("TaskSubtasks")
 
   @@index([dueDate])
   @@index([dueDate, completed])
+  @@index([parentId])
 }
 
 model DayOrderItem {

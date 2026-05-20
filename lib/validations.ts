@@ -43,6 +43,13 @@ export const weekDataSchema = z.object({
 export const createTaskSchema = z.object({
   title: z.string().min(1).max(500),
   dueDateISO: z.string().regex(localDateRegex),
+  parentId: uuid.optional().nullable(),
+});
+
+export const updateTaskSchema = z.object({
+  id: uuid,
+  title: z.string().min(1).max(500).optional(),
+  dueDateISO: z.string().regex(localDateRegex).optional(),
 });
 
 export const taskIdSchema = z.object({ id: uuid });
@@ -75,6 +82,7 @@ export type LogHabitInput = z.infer<typeof logHabitSchema>;
 export type UnlogHabitInput = z.infer<typeof unlogHabitSchema>;
 export type WeekDataInput = z.infer<typeof weekDataSchema>;
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
+export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type ListTasksInput = z.infer<typeof listTasksSchema>;
 export type AddFoodEntryInput = z.infer<typeof addFoodEntrySchema>;
 

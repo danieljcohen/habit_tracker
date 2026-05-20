@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { href: "/tasks", label: "Today", icon: "✓" },
   { href: "/week", label: "Week", icon: "📅" },
+  { href: "/plans", label: "Plans", icon: "🎯" },
   { href: "/metrics", label: "Metrics", icon: "📊" },
   { href: "/coach", label: "Coach", icon: "💬" },
 ] as const;
@@ -24,7 +25,7 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
-            className={`flex flex-col items-center gap-0.5 min-w-[72px] py-1 rounded-lg transition-colors ${
+            className={`flex flex-col items-center gap-0.5 min-w-[56px] px-1 py-1 rounded-lg transition-colors ${
               isActive
                 ? "text-teal-600 dark:text-teal-400 font-medium"
                 : "text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-300"

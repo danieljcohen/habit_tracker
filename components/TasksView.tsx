@@ -145,6 +145,7 @@ export function TasksView({
         id: result.task.id,
         title: result.task.title,
         completed: result.task.completed,
+        parentTitle: null,
       };
       const next = [...items, newItem];
       await persistOrder(next);
@@ -661,7 +662,7 @@ function SortableRow({
         type="button"
         onClick={() => onToggleTask(t.id)}
         disabled={pending !== null}
-        className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+        className={`shrink-0 mt-0.5 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
           t.completed
             ? "bg-teal-600 border-teal-600 text-white"
             : "border-stone-400 dark:border-stone-500 hover:border-teal-500"
@@ -669,15 +670,22 @@ function SortableRow({
       >
         {t.completed && <span className="text-sm">✓</span>}
       </button>
-      <span
-        className={`flex-1 text-left text-stone-800 dark:text-stone-200 ${
-          t.completed
-            ? "line-through text-stone-500 dark:text-stone-400"
-            : ""
-        }`}
-      >
-        {t.title}
-      </span>
+      <div className="flex-1 min-w-0">
+        <div
+          className={`text-left text-stone-800 dark:text-stone-200 ${
+            t.completed
+              ? "line-through text-stone-500 dark:text-stone-400"
+              : ""
+          }`}
+        >
+          {t.title}
+        </div>
+        {t.parentTitle && (
+          <div className="text-xs text-stone-500 dark:text-stone-400 truncate">
+            ↳ {t.parentTitle}
+          </div>
+        )}
+      </div>
       <button
         type="button"
         onClick={() => onDeleteTask(t.id)}

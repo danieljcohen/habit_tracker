@@ -33,6 +33,7 @@ export type DayItem =
       id: string;
       title: string;
       completed: boolean;
+      parentTitle: string | null;
     };
 
 type PageProps = { searchParams: Promise<{ date?: string }> };
@@ -101,6 +102,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
       id: t.id,
       title: t.title,
       completed: t.completed,
+      parentTitle: t.parent?.title ?? null,
     };
     dayItemsMap.set(`task:${t.id}`, item);
   }
